@@ -8,8 +8,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AdonisUI.Controls;
+using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Readers;
 using CUE4Parse.UE4.Vfs;
+using FModel.AssetEditor;
 using FModel.Extensions;
 using FModel.Framework;
 using FModel.Services;
@@ -120,7 +122,7 @@ public class LoadCommand : ViewModelCommand<LoadingModesViewModel>
         }
 
         var hasFilter = filter != null && filter.Count != 0;
-        var entries = new List<VfsEntry>();
+        var files = new List<GameFile>();
 
         foreach (var asset in _applicationView.CUE4Parse.Provider.Files.Values)
         {
@@ -132,13 +134,24 @@ public class LoadCommand : ViewModelCommand<LoadingModesViewModel>
             if (hasFilter)
             {
                 if (filter.Contains(entry.Vfs.Name))
-                    entries.Add(entry);
+                    files.Add(entry);
             }
             else
-                entries.Add(entry);
+                files.Add(entry);
         }
 
-        _applicationView.CUE4Parse.AssetsFolder.BulkPopulate(entries);
+        if (_applicationView.CUE4Parse.Provider is EditorFileProvider efp && (!hasFilter || filter.Contains(EditorFileProvider.LocalFilesDirectoryName)))
+        {
+            foreach (var file in efp.OsFiles.Values)
+            {
+                if (file.Extension == "uasset")
+                {
+                    files.Add(file);
+                }
+            }
+        }
+
+        _applicationView.CUE4Parse.AssetsFolder.BulkPopulate(files);
     }
 
     private void FilterNewOrModifiedFilesToDisplay(CancellationToken cancellationToken)

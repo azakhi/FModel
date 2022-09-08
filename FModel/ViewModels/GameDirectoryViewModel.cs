@@ -1,4 +1,4 @@
-﻿using FModel.Framework;
+using FModel.Framework;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
@@ -107,6 +107,20 @@ public class GameDirectoryViewModel : ViewModel
                 Guid = reader.EncryptionKeyGuid,
                 IsEncrypted = reader.IsEncrypted,
                 IsEnabled = false,
+                Key = string.Empty
+            });
+        });
+    }
+
+    public void Add(string name, long length)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            DirectoryFiles.Add(new FileItem(name, length)
+            {
+                Guid = new FGuid(),
+                IsEncrypted = false,
+                IsEnabled = true,
                 Key = string.Empty
             });
         });

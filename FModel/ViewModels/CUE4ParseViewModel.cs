@@ -31,6 +31,7 @@ using CUE4Parse.UE4.Wwise;
 using CUE4Parse_Conversion;
 using CUE4Parse_Conversion.Sounds;
 using EpicManifestParser.Objects;
+using FModel.AssetEditor;
 using FModel.Creator;
 using FModel.Extensions;
 using FModel.Framework;
@@ -136,7 +137,7 @@ public class CUE4ParseViewModel : ViewModel
                     }
                     default:
                     {
-                        Provider = new DefaultFileProvider(gameDirectory, SearchOption.AllDirectories, true, versions);
+                        Provider = new EditorFileProvider(gameDirectory, SearchOption.AllDirectories, true, versions);
                         break;
                     }
                 }
@@ -223,6 +224,11 @@ public class CUE4ParseViewModel : ViewModel
                     }
 
                     break;
+                case EditorFileProvider e:
+                    e.Initialize();
+                    e.LoadLocalFiles();
+                    GameDirectory.Add(EditorFileProvider.LocalFilesDirectoryName, e.Length);
+                    break;
                 case DefaultFileProvider d:
                     d.Initialize();
                     break;
@@ -262,6 +268,13 @@ public class CUE4ParseViewModel : ViewModel
             foreach (var file in GameDirectory.DirectoryFiles)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (file.Name == EditorFileProvider.LocalFilesDirectoryName)
+                {
+                    file.IsEnabled = true;
+                    file.FileCount = (Provider as EditorFileProvider)?.FileCount ?? 0;
+                    continue;
+                }
+
                 if (Provider.MountedVfs.FirstOrDefault(x => x.Name == file.Name) is not { } vfs)
                 {
                     if (Provider.UnloadedVfs.FirstOrDefault(x => x.Name == file.Name) is IoStoreReader store)

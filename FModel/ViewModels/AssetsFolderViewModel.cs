@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Versions;
 using CUE4Parse.UE4.Vfs;
 using FModel.Framework;
@@ -87,20 +88,21 @@ public class AssetsFolderViewModel
         FoldersView = new ListCollectionView(Folders) { SortDescriptions = { new SortDescription("Header", ListSortDirection.Ascending) } };
     }
 
-    public void BulkPopulate(IReadOnlyCollection<VfsEntry> entries)
+    public void BulkPopulate(IReadOnlyCollection<GameFile> files)
     {
-        if (entries == null || entries.Count == 0)
+        if (files == null || files.Count == 0)
             return;
 
         Application.Current.Dispatcher.Invoke(() =>
         {
             var treeItems = new RangeObservableCollection<TreeItem>();
             treeItems.SetSuppressionState(true);
-            var items = new List<AssetItem>(entries.Count);
+            var items = new List<AssetItem>(files.Count);
 
-            foreach (var entry in entries)
+            foreach (var file in files)
             {
-                var item = new AssetItem(entry.Path, entry.IsEncrypted, entry.Offset, entry.Size, entry.Vfs.Name, entry.CompressionMethod);
+                var entry = file as VfsEntry;
+                var item = new AssetItem(file.Path, file.IsEncrypted, entry?.Offset ?? 0, file.Size, entry?.Vfs.Name ?? "", file.CompressionMethod);
                 items.Add(item);
 
                 {
@@ -129,7 +131,7 @@ public class AssetsFolderViewModel
                         if (lastNode == null)
                         {
                             var nodePath = builder.ToString();
-                            lastNode = new TreeItem(folder, item.Package, entry.Vfs.MountPoint, entry.Vfs.Ver.Value, nodePath[..^1]);
+                            lastNode = new TreeItem(folder, item.Package, entry?.Vfs.MountPoint ?? "", entry?.Vfs.Ver.Value ?? 0, nodePath[..^1]);
                             lastNode.Folders.SetSuppressionState(true);
                             lastNode.AssetsList.Assets.SetSuppressionState(true);
                             parentNode.Add(lastNode);
