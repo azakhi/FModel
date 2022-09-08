@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -50,6 +51,10 @@ public class AesManagerViewModel : ViewModel
                 MainKey = string.Empty,
                 DynamicKeys = null
             };
+
+#if DEBUG
+            _keysFromSettings.MainKey = Environment.GetEnvironmentVariable("FModelAESKey");
+#endif
 
             _mainKey.Key = FixKey(_keysFromSettings.MainKey);
             AesKeys = new FullyObservableCollection<FileItem>(EnumerateAesKeys());
