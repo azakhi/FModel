@@ -446,21 +446,8 @@ public class ModelViewerViewModel : ViewModel
                 var mip = specular.GetFirstMip();
                 byte[] data;
                 SKColorType colorType;
-                switch (UserSettings.Default.OverridedPlatform)
-                {
-                    case ETexturePlatform.Playstation:
-                        PlaystationDecoder.DecodeTexturePlaystation(mip, specular.Format, specular.isNormalMap,
-                            out data, out colorType);
-                        break;
-                    case ETexturePlatform.NintendoSwitch:
-                        NintendoSwitchDecoder.DecodeTextureNSW(mip, specular.Format, specular.isNormalMap,
-                            out data, out colorType);
-                        break;
-                    default:
-                        TextureDecoder.DecodeTexture(mip, specular.Format, specular.isNormalMap,
-                            out data, out colorType);
-                        break;
-                }
+                TextureDecoder.DecodeTexture(mip, specular.Format, specular.isNormalMap, UserSettings.Default.OverridedPlatform,
+                    out data, out colorType);
 
 
                 switch (_game)

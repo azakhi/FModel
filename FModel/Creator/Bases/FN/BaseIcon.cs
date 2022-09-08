@@ -12,7 +12,7 @@ using CUE4Parse.UE4.Objects.Core.Math;
 using CUE4Parse.UE4.Objects.GameplayTags;
 using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse_Conversion.Textures;
-using CUE4Parse_Fortnite.Enums;
+using CUE4Parse.FN.Enums;
 using FModel.Settings;
 using SkiaSharp;
 
