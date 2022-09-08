@@ -97,6 +97,7 @@ public class GameSelectorViewModel : ViewModel
 
     private IEnumerable<DetectedGame> EnumerateDetectedGames()
     {
+        yield return GetSteamGame(1708520, "\\F1Manager22\\Content\\Paks"); // F1 Manager 2022
         yield return GetUnrealEngineGame("Fortnite", "\\FortniteGame\\Content\\Paks");
         yield return new DetectedGame { GameName = "Fortnite [LIVE]", GameDirectory = Constants._FN_LIVE_TRIGGER };
         yield return GetUnrealEngineGame("Pewee", "\\RogueCompany\\Content\\Paks");
