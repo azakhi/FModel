@@ -21,6 +21,7 @@ using CUE4Parse.UE4.Assets.Exports.Sound;
 using CUE4Parse.UE4.Assets.Exports.StaticMesh;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Assets.Exports.Wwise;
+using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.IO;
 using CUE4Parse.UE4.Localization;
 using CUE4Parse.UE4.Oodle.Objects;
@@ -720,6 +721,77 @@ public class CUE4ParseViewModel : ViewModel
             if (CheckExport(e))
                 break;
         }
+    }
+
+    public bool CanExtractValueMap(string fullPath, out OsGameFile file)
+    {
+        file = null;
+        if (Provider is not EditorFileProvider efp)
+        {
+            return false;
+        }
+
+        return efp.TryGetUassetDuo(fullPath, out file, out var uexpFile);
+    }
+
+    public Dictionary<string, float> ExtractValueMap(string fullPath)
+    {
+        var result = new Dictionary<string, float>();
+        var floatMap = ExtractFloatMap(fullPath);
+        foreach (var kvp in floatMap)
+        {
+            result.Add(kvp.Key, (kvp.Value.Tag as FloatProperty).Value);
+        }
+
+        return result;
+    }
+
+    public void ImportValueMap(string fullPath, Dictionary<string, float> valueMap)
+    {
+        if (Provider is not EditorFileProvider efp || !efp.TryGetUassetDuo(fullPath, out var uassetFile, out var uexpFile))
+        {
+            return;
+        }
+
+        var extractedMap = ExtractFloatMap(fullPath);
+        using (var fs = new FileStream(uexpFile.ActualFile.FullName, FileMode.Open, FileAccess.Write))
+        {
+            foreach (var kvp in valueMap)
+            {
+                if (extractedMap.TryGetValue(kvp.Key, out var value) && (value.Tag as FloatProperty).Value != kvp.Value)
+                {
+                    var bytes = BitConverter.GetBytes(kvp.Value);
+                    fs.Seek(value.Offset, SeekOrigin.Begin);
+                    fs.Write(bytes, 0, bytes.Length);
+                    FLogger.AppendText($"Successfully updated {value.Name.Text} from {(value.Tag as FloatProperty).Value} to {kvp.Value}", Constants.GREEN, true);
+                }
+            }
+        }
+    }
+
+    private Dictionary<string, FPropertyTag> ExtractFloatMap(string fullPath)
+    {
+        var result = new Dictionary<string, FPropertyTag>();
+
+        var ext = fullPath.SubstringAfterLast('.').ToLower();
+        if (ext == "uasset")
+        {
+            var exports = Provider.LoadObjectExports(fullPath);
+            foreach (var export in exports)
+            {
+                foreach (var property in export.Properties)
+                {
+                    if (property.Tag is not FloatProperty floatProperty)
+                    {
+                        continue;
+                    }
+
+                    result.Add($"{property.Name.Text} ({property.Offset})", property);
+                }
+            }
+        }
+
+        return result;
     }
 
     private bool CheckExport(UObject export) // return true once you wanna stop searching for exports

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Linq;
 using FModel.Framework;
 using FModel.Services;
@@ -56,6 +56,30 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
                         cancellationToken.ThrowIfCancellationRequested();
                         contextViewModel.CUE4Parse.Extract(asset.FullPath);
                         contextViewModel.CUE4Parse.TabControl.SelectedTab.SaveImage(false);
+                    }
+
+                    break;
+                case "Assets_Export_Value_Map":
+                    foreach (var asset in assetItems)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (contextViewModel.CUE4Parse.CanExtractValueMap(asset.FullPath, out var osGameFile))
+                        {
+                            var valueMap = contextViewModel.CUE4Parse.ExtractValueMap(asset.FullPath);
+                            contextViewModel.CUE4Parse.TabControl.SelectedTab.ExportValueMap(osGameFile.Name, valueMap);
+                        }
+                    }
+
+                    break;
+                case "Assets_Import_Value_Map":
+                    foreach (var asset in assetItems)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (contextViewModel.CUE4Parse.CanExtractValueMap(asset.FullPath, out var osGameFile))
+                        {
+                            var valueMap = contextViewModel.CUE4Parse.TabControl.SelectedTab.ImportValueMap(osGameFile.Name);
+                            contextViewModel.CUE4Parse.ImportValueMap(asset.FullPath, valueMap);
+                        }
                     }
 
                     break;

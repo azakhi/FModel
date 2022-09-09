@@ -54,6 +54,32 @@ namespace FModel.AssetEditor
             return new Package(uasset, uexp, ubulk, uptnl, this, MappingsForGame, UseLazySerialization);
         }
 
+        public bool TryGetUassetDuo(string fullPath, out OsGameFile uassetFile, out OsGameFile uexpFile)
+        {
+            uassetFile = null;
+            uexpFile = null;
+
+            if (this[fullPath] is not OsGameFile uassetOsFile)
+            {
+                return false;
+            }
+
+            if (uassetOsFile.Extension != "uasset")
+            {
+                return false;
+            }
+
+            var uexpPath = Path.ChangeExtension(fullPath, ".uexp");
+            if (this[uexpPath] is not OsGameFile uaexpOsFile)
+            {
+                return false;
+            }
+
+            uassetFile = uassetOsFile;
+            uexpFile = uaexpOsFile;
+            return true;
+        }
+
         public void LoadLocalFiles()
         {
             FileCount = 0;

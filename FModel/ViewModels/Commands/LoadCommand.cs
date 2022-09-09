@@ -40,8 +40,10 @@ public class LoadCommand : ViewModelCommand<LoadingModesViewModel>
 
     public override async void Execute(LoadingModesViewModel contextViewModel, object parameter)
     {
+        var parameterList = (IList) parameter;
+        var isLocalOnly = parameterList.Count == 1 && (parameterList[0] as FileItem).Name == EditorFileProvider.LocalFilesDirectoryName;
         if (_applicationView.CUE4Parse.GameDirectory.HasNoFile) return;
-        if (_applicationView.CUE4Parse.Provider.Files.Count <= 0)
+        if (_applicationView.CUE4Parse.Provider.Files.Count <= 0 && !isLocalOnly)
         {
             FLogger.AppendError();
             FLogger.AppendText("An encrypted archive has been found. In order to decrypt it, please specify a working AES encryption key", Constants.WHITE, true);

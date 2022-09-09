@@ -17,6 +17,7 @@ using System.Windows;
 using System.Windows.Media.Imaging;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse_Conversion.Textures;
+using Newtonsoft.Json;
 
 namespace FModel.ViewModels;
 
@@ -328,6 +329,47 @@ public class TabItem : ViewModel
 
         Application.Current.Dispatcher.Invoke(() => File.WriteAllText(directory, Document.Text));
         SaveCheck(directory, fileName);
+    }
+
+    public void ExportValueMap(string fileName, Dictionary<string, float> valueMap)
+    {
+        var json = JsonConvert.SerializeObject(valueMap, Formatting.Indented);
+        var jsonName = Path.ChangeExtension(fileName, ".json");
+        var directory = Path.Combine(UserSettings.Default.PropertiesDirectory,
+            UserSettings.Default.KeepDirectoryStructure ? Directory : "", jsonName).Replace('\\', '/');
+
+        var saveFileDialog = new SaveFileDialog
+        {
+            Title = "Exporting " + fileName,
+            FileName = jsonName,
+            InitialDirectory = UserSettings.Default.PropertiesDirectory,
+            Filter = "JSON Files (*.json)|*.json"
+        };
+
+        var result = saveFileDialog.ShowDialog();
+        if (!result.HasValue || !result.Value)
+            return;
+        directory = saveFileDialog.FileName;
+
+        Application.Current.Dispatcher.Invoke(() => File.WriteAllText(directory, json));
+        SaveCheck(directory, jsonName);
+    }
+
+    public Dictionary<string, float> ImportValueMap(string fileName)
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Title = "Importing " + fileName,
+            InitialDirectory = UserSettings.Default.PropertiesDirectory,
+            Filter = "JSON Files (*.json)|*.json"
+        };
+
+        var result = openFileDialog.ShowDialog();
+        if (!result.HasValue || !result.Value) return new Dictionary<string, float>();
+
+        var text = File.ReadAllText(openFileDialog.FileName);
+        var parsed = JsonConvert.DeserializeObject<Dictionary<string, float>>(text);
+        return parsed;
     }
 
     private void SaveCheck(string path, string fileName)
