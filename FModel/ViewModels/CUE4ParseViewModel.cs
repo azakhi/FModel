@@ -22,6 +22,7 @@ using CUE4Parse.UE4.Assets.Exports.StaticMesh;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Assets.Exports.Wwise;
 using CUE4Parse.UE4.Assets.Objects;
+using CUE4Parse.UE4.Assets.Utils;
 using CUE4Parse.UE4.IO;
 using CUE4Parse.UE4.Localization;
 using CUE4Parse.UE4.Oodle.Objects;
@@ -734,64 +735,214 @@ public class CUE4ParseViewModel : ViewModel
         return efp.TryGetUassetDuo(fullPath, out file, out var uexpFile);
     }
 
-    public Dictionary<string, float> ExtractValueMap(string fullPath)
+    public Dictionary<string, object> ExtractValueMap(string fullPath)
     {
-        var result = new Dictionary<string, float>();
-        var floatMap = ExtractFloatMap(fullPath);
-        foreach (var kvp in floatMap)
+        var result = new Dictionary<string, object>();
+        if (Provider is not EditorFileProvider efp || !efp.TryGetUassetDuo(fullPath, out var uassetFile, out var uexpFile))
         {
-            result.Add(kvp.Key, (kvp.Value.Tag as FloatProperty).Value);
+            return result;
+        }
+
+        var ext = fullPath.SubstringAfterLast('.').ToLower();
+        if (ext == "uasset")
+        {
+            var editableProperties = new Dictionary<string, FPropertyTag>();
+            var exports = Provider.LoadObjectExports(fullPath);
+            foreach (var export in exports)
+            {
+                GetEditableProperties(export.Properties, editableProperties, result);
+            }
         }
 
         return result;
     }
 
-    public void ImportValueMap(string fullPath, Dictionary<string, float> valueMap)
+    public void ImportValueMap(string fullPath, Dictionary<string, object> valueMap)
     {
         if (Provider is not EditorFileProvider efp || !efp.TryGetUassetDuo(fullPath, out var uassetFile, out var uexpFile))
         {
             return;
         }
 
-        var extractedMap = ExtractFloatMap(fullPath);
+        var ext = fullPath.SubstringAfterLast('.').ToLower();
+        if (ext != "uasset")
+        {
+            return;
+        }
+
+        var editableProperties = new Dictionary<string, FPropertyTag>();
+        var outputDict = new Dictionary<string, object>();
+        var exports = Provider.LoadObjectExports(fullPath);
+        foreach (var export in exports)
+        {
+            GetEditableProperties(export.Properties, editableProperties, outputDict);
+        }
+
         using (var fs = new FileStream(uexpFile.ActualFile.FullName, FileMode.Open, FileAccess.Write))
         {
-            foreach (var kvp in valueMap)
+            WriteEditedProperties(fs, valueMap, editableProperties);
+        }
+    }
+
+    private void GetEditableProperties(IEnumerable<FPropertyTag> properties, Dictionary<string, FPropertyTag> editableProperties, Dictionary<string, object> outputDict)
+    {
+        foreach (var property in properties)
+        {
+            CheckAndAddEditableProperties(property, editableProperties, outputDict);
+        }
+    }
+
+    private void WriteEditedProperties(FileStream stream, Dictionary<string, object> valueMap, Dictionary<string, FPropertyTag> editableProperties)
+    {
+        foreach (var kvp in valueMap)
+        {
+            if (editableProperties.TryGetValue(kvp.Key, out var property))
             {
-                if (extractedMap.TryGetValue(kvp.Key, out var value) && (value.Tag as FloatProperty).Value != kvp.Value)
-                {
-                    var bytes = BitConverter.GetBytes(kvp.Value);
-                    fs.Seek(value.Offset, SeekOrigin.Begin);
-                    fs.Write(bytes, 0, bytes.Length);
-                    FLogger.AppendText($"Successfully updated {value.Name.Text} from {(value.Tag as FloatProperty).Value} to {kvp.Value}", Constants.GREEN, true);
-                }
+                WritePropertyEditData(stream, property, kvp.Value);
+            }
+            else
+            {
+                WriteContainerEditData(stream, editableProperties, kvp.Key, kvp.Value);
             }
         }
     }
 
-    private Dictionary<string, FPropertyTag> ExtractFloatMap(string fullPath)
+    private void CheckAndAddEditableProperties(FPropertyTag property, Dictionary<string, FPropertyTag> editableProperties, Dictionary<string, object> outputDict)
     {
-        var result = new Dictionary<string, FPropertyTag>();
-
-        var ext = fullPath.SubstringAfterLast('.').ToLower();
-        if (ext == "uasset")
+        if (property.Tag is FloatProperty floatProperty)
         {
-            var exports = Provider.LoadObjectExports(fullPath);
-            foreach (var export in exports)
+            editableProperties.Add(property.PName(), property);
+            outputDict.Add(property.PName(), floatProperty.Value);
+        }
+        else if (property.Tag is IntProperty intProperty)
+        {
+            editableProperties.Add(property.PName(), property);
+            outputDict.Add(property.PName(), intProperty.Value);
+        }
+        else if (property.Tag is ByteProperty byteProperty)
+        {
+            editableProperties.Add(property.PName(), property);
+            outputDict.Add(property.PName(), byteProperty.Value);
+        }
+        else if (property.Tag is StructProperty || property.Tag is MapProperty)
+        {
+            var childOutputDict = new Dictionary<string, object>();
+            CheckAndAddEditableProperties(property.Tag, editableProperties, childOutputDict);
+            if (childOutputDict.Count > 0)
             {
-                foreach (var property in export.Properties)
-                {
-                    if (property.Tag is not FloatProperty floatProperty)
-                    {
-                        continue;
-                    }
-
-                    result.Add($"{property.Name.Text} ({property.Offset})", property);
-                }
+                outputDict.Add(property.PName(), childOutputDict);
             }
         }
+    }
 
-        return result;
+    private void CheckAndAddEditableProperties(FPropertyTagType propertyType, Dictionary<string, FPropertyTag> editableProperties, Dictionary<string, object> outputDict)
+    {
+        if (propertyType is StructProperty structProperty)
+        {
+            var ustruct = structProperty.Value;
+            if (ustruct.StructType is FStructFallback structFallback)
+            {
+                GetEditableProperties(structFallback.Properties, editableProperties, outputDict);
+            }
+        }
+        else if (propertyType is MapProperty mapProperty)
+        {
+            var umap = mapProperty.Value;
+            var counter = -1;
+            foreach (var kvp in umap.Properties)
+            {
+                counter++;
+                var key = kvp.Key?.ToString();
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                var childOutputDict = new Dictionary<string, object>();
+                CheckAndAddEditableProperties(kvp.Value, editableProperties, childOutputDict);
+                if (childOutputDict.Count <= 0)
+                {
+                    continue;
+                }
+
+                outputDict.Add(key + "_" + counter, childOutputDict);
+            }
+        }
+    }
+
+    private void WritePropertyEditData(FileStream stream, FPropertyTag property, object newValue)
+    {
+        if (property.Tag is FloatProperty floatProperty)
+        {
+            if (!float.TryParse(newValue.ToString(), out var value))
+            {
+                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                return;
+            }
+
+            if (floatProperty.Value == value)
+            {
+                return;
+            }
+
+            var bytes = BitConverter.GetBytes(value);
+            stream.Seek(property.Offset, SeekOrigin.Begin);
+            stream.Write(bytes, 0, bytes.Length);
+            FLogger.AppendText($"Successfully updated {property.PName()} from {floatProperty.Value} to {value}", Constants.GREEN, true);
+        }
+        else if (property.Tag is IntProperty intProperty)
+        {
+            if (!int.TryParse(newValue.ToString(), out var value))
+            {
+                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                return;
+            }
+
+            if (intProperty.Value == value)
+            {
+                return;
+            }
+
+            var bytes = BitConverter.GetBytes(value);
+            stream.Seek(property.Offset, SeekOrigin.Begin);
+            stream.Write(bytes, 0, bytes.Length);
+            FLogger.AppendText($"Successfully updated {property.PName()} from {intProperty.Value} to {value}", Constants.GREEN, true);
+        }
+        else if (property.Tag is ByteProperty byteProperty)
+        {
+            if (!byte.TryParse(newValue.ToString(), out var value))
+            {
+                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                return;
+            }
+
+            if (byteProperty.Value == value)
+            {
+                return;
+            }
+
+            stream.Seek(property.Offset, SeekOrigin.Begin);
+            stream.Write(new byte[] { value }, 0, 1);
+            FLogger.AppendText($"Successfully updated {property.PName()} from {byteProperty.Value} to {value}", Constants.GREEN, true);
+        }
+    }
+
+    private void WriteContainerEditData(FileStream stream, Dictionary<string, FPropertyTag> editableProperties, string identifier, object value)
+    {
+        if (value is not Newtonsoft.Json.Linq.JObject jobjectValue)
+        {
+            FLogger.AppendText($"Edited value for {identifier} is invalid", Constants.RED, true);
+            return;
+        }
+
+        var container = jobjectValue.ToObject<Dictionary<string, object>>();
+        if (container == null)
+        {
+            FLogger.AppendText($"Edited value for {identifier} is invalid", Constants.RED, true);
+            return;
+        }
+
+        WriteEditedProperties(stream, container, editableProperties);
     }
 
     private bool CheckExport(UObject export) // return true once you wanna stop searching for exports
@@ -942,5 +1093,13 @@ public class CUE4ParseViewModel : ViewModel
             FLogger.AppendError();
             FLogger.AppendText($"Could not export '{fileName}'", Constants.WHITE, true);
         }
+    }
+}
+
+public static class FPropertyTagExtensions
+{
+    public static string PName(this FPropertyTag property)
+    {
+        return $"{property.Name.Text} ({property.Offset})";
     }
 }
