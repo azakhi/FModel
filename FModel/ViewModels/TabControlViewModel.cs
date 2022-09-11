@@ -331,7 +331,7 @@ public class TabItem : ViewModel
         SaveCheck(directory, fileName);
     }
 
-    public void ExportValueMap(string fileName, Dictionary<string, float> valueMap)
+    public void ExportValueMap(string fileName, Dictionary<string, object> valueMap)
     {
         var json = JsonConvert.SerializeObject(valueMap, Formatting.Indented);
         var jsonName = Path.ChangeExtension(fileName, ".json");
@@ -355,7 +355,7 @@ public class TabItem : ViewModel
         SaveCheck(directory, jsonName);
     }
 
-    public Dictionary<string, float> ImportValueMap(string fileName)
+    public Dictionary<string, object> ImportValueMap(string fileName)
     {
         var openFileDialog = new OpenFileDialog
         {
@@ -365,10 +365,10 @@ public class TabItem : ViewModel
         };
 
         var result = openFileDialog.ShowDialog();
-        if (!result.HasValue || !result.Value) return new Dictionary<string, float>();
+        if (!result.HasValue || !result.Value) return new Dictionary<string, object>();
 
         var text = File.ReadAllText(openFileDialog.FileName);
-        var parsed = JsonConvert.DeserializeObject<Dictionary<string, float>>(text);
+        var parsed = JsonConvert.DeserializeObject<Dictionary<string, object>>(text);
         return parsed;
     }
 
