@@ -724,6 +724,85 @@ public class CUE4ParseViewModel : ViewModel
         }
     }
 
+    public byte[] ExportDatabase(string fullPath, out string fileName)
+    {
+        fileName = null;
+        if (Provider is not EditorFileProvider efp || !efp.TryGetUassetDuo(fullPath, out var uassetFile, out var uexpFile))
+        {
+            return null;
+        }
+
+        fileName = uassetFile.Name;
+
+        var exports = Provider.LoadObjectExports(fullPath);
+        foreach (var export in exports)
+        {
+            if (export.ExportType != "DatabaseAsset")
+            {
+                continue;
+            }
+
+            foreach (var property in export.Properties)
+            {
+                if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
+                {
+                    continue;
+                }
+
+                var data = new byte[arrayProperty.Value.Properties.Count];
+                for (var i = 0; i < data.Length; i++)
+                {
+                    data[i] = (arrayProperty.Value.Properties[i] as ByteProperty).Value;
+                }
+
+                if (data.Length > 0)
+                {
+                    return data;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public void ImportDatabase(string fullPath, byte[] data)
+    {
+        if (data == null || data.Length <= 0 || Provider is not EditorFileProvider efp || !efp.TryGetUassetDuo(fullPath, out var uassetFile, out var uexpFile))
+        {
+            return;
+        }
+
+        var exports = Provider.LoadObjectExports(fullPath);
+        foreach (var export in exports)
+        {
+            if (export.ExportType != "DatabaseAsset")
+            {
+                continue;
+            }
+
+            foreach (var property in export.Properties)
+            {
+                if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
+                {
+                    continue;
+                }
+
+                if (data.Length != arrayProperty.Value.Properties.Count)
+                {
+                    continue;
+                }
+
+                using (var fs = new FileStream(uexpFile.ActualFile.FullName, FileMode.Open, FileAccess.Write))
+                {
+                    fs.Seek(property.Offset + 4, SeekOrigin.Begin);
+                    fs.Write(data, 0, data.Length);
+                }
+
+                FLogger.AppendText($"Successfully imported database for file {uassetFile.Name}", Constants.GREEN, true);
+            }
+        }
+    }
+
     public bool CanExtractValueMap(string fullPath, out OsGameFile file)
     {
         file = null;

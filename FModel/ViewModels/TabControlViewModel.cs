@@ -372,6 +372,46 @@ public class TabItem : ViewModel
         return parsed;
     }
 
+    public void ExportDatabase(string fileName, byte[] data)
+    {
+        var dbName = Path.ChangeExtension(fileName, ".db");
+        var directory = Path.Combine(UserSettings.Default.PropertiesDirectory,
+            UserSettings.Default.KeepDirectoryStructure ? Directory : "", dbName).Replace('\\', '/');
+
+        var saveFileDialog = new SaveFileDialog
+        {
+            Title = "Exporting database " + fileName,
+            FileName = dbName,
+            InitialDirectory = UserSettings.Default.PropertiesDirectory,
+            Filter = "DB Files (*.db)|*.db"
+        };
+
+        var result = saveFileDialog.ShowDialog();
+        if (!result.HasValue || !result.Value)
+            return;
+        directory = saveFileDialog.FileName;
+
+        Application.Current.Dispatcher.Invoke(() => File.WriteAllBytes(directory, data));
+        SaveCheck(directory, dbName);
+    }
+
+    public byte[] ImportDatabase()
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Title = "Importing Database",
+            InitialDirectory = UserSettings.Default.PropertiesDirectory,
+            Filter = "DB Files (*.db)|*.db"
+        };
+
+        var result = openFileDialog.ShowDialog();
+        if (!result.HasValue || !result.Value)
+            return null;
+
+        var data = File.ReadAllBytes(openFileDialog.FileName);
+        return data;
+    }
+
     private void SaveCheck(string path, string fileName)
     {
         if (File.Exists(path))

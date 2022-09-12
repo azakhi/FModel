@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using CUE4Parse.FileProvider;
 using FModel.Framework;
 using FModel.Services;
 
@@ -80,6 +81,27 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
                             var valueMap = contextViewModel.CUE4Parse.TabControl.SelectedTab.ImportValueMap(osGameFile.Name);
                             contextViewModel.CUE4Parse.ImportValueMap(asset.FullPath, valueMap);
                         }
+                    }
+
+                    break;
+                case "Assets_Export_Database":
+                    foreach (var asset in assetItems)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var exportedDb = contextViewModel.CUE4Parse.ExportDatabase(asset.FullPath, out var fileName);
+                        if (exportedDb != null)
+                        {
+                            contextViewModel.CUE4Parse.TabControl.SelectedTab.ExportDatabase(fileName, exportedDb);
+                        }
+                    }
+
+                    break;
+                case "Assets_Import_Database":
+                    foreach (var asset in assetItems)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var databaseData = contextViewModel.CUE4Parse.TabControl.SelectedTab.ImportDatabase();
+                        contextViewModel.CUE4Parse.ImportDatabase(asset.FullPath, databaseData);
                     }
 
                     break;
