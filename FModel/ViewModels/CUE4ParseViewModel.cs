@@ -12,6 +12,7 @@ using CUE4Parse.FileProvider;
 using CUE4Parse.FileProvider.Vfs;
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.AssetRegistry;
+using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Animation;
 using CUE4Parse.UE4.Assets.Exports.Material;
@@ -25,6 +26,7 @@ using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Utils;
 using CUE4Parse.UE4.IO;
 using CUE4Parse.UE4.Localization;
+using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse.UE4.Oodle.Objects;
 using CUE4Parse.UE4.Readers;
 using CUE4Parse.UE4.Shaders;
@@ -735,30 +737,34 @@ public class CUE4ParseViewModel : ViewModel
         fileName = uassetFile.Name;
 
         var exports = Provider.LoadObjectExports(fullPath);
-        foreach (var export in exports)
+        if (exports.Count() > 1)
         {
-            if (export.ExportType != "DatabaseAsset")
+            FLogger.AppendText($"Exporting database from files with multiple exports is not supported", Constants.RED, true);
+            return null;
+        }
+
+        var export = exports.First();
+        if (export.ExportType != "DatabaseAsset")
+        {
+            return null;
+        }
+
+        foreach (var property in export.Properties)
+        {
+            if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
             {
                 continue;
             }
 
-            foreach (var property in export.Properties)
+            var data = new byte[arrayProperty.Value.Properties.Count];
+            for (var i = 0; i < data.Length; i++)
             {
-                if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
-                {
-                    continue;
-                }
+                data[i] = (arrayProperty.Value.Properties[i] as ByteProperty).Value;
+            }
 
-                var data = new byte[arrayProperty.Value.Properties.Count];
-                for (var i = 0; i < data.Length; i++)
-                {
-                    data[i] = (arrayProperty.Value.Properties[i] as ByteProperty).Value;
-                }
-
-                if (data.Length > 0)
-                {
-                    return data;
-                }
+            if (data.Length > 0)
+            {
+                return data;
             }
         }
 
@@ -773,33 +779,77 @@ public class CUE4ParseViewModel : ViewModel
         }
 
         var exports = Provider.LoadObjectExports(fullPath);
-        foreach (var export in exports)
+        if (exports.Count() > 1)
         {
-            if (export.ExportType != "DatabaseAsset")
+            FLogger.AppendText($"Importing database to files with multiple exports is not supported", Constants.RED, true);
+            return;
+        }
+
+        var export = exports.First();
+        if (export.ExportType != "DatabaseAsset" || export.Owner is not Package ownerPackage)
+        {
+            return;
+        }
+
+        foreach (var property in export.Properties)
+        {
+            if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
             {
                 continue;
             }
 
-            foreach (var property in export.Properties)
+            var originalSize = arrayProperty.Value.Properties.Count;
+            if (data.Length == originalSize)
             {
-                if (property.Name.Text != "Data" || property.Tag is not ArrayProperty arrayProperty || arrayProperty.Value.InnerType != "ByteProperty")
-                {
-                    continue;
-                }
-
-                if (data.Length != arrayProperty.Value.Properties.Count)
-                {
-                    continue;
-                }
-
                 using (var fs = new FileStream(uexpFile.ActualFile.FullName, FileMode.Open, FileAccess.Write))
                 {
                     fs.Seek(property.Offset + 4, SeekOrigin.Begin);
                     fs.Write(data, 0, data.Length);
                 }
-
-                FLogger.AppendText($"Successfully imported database for file {uassetFile.Name}", Constants.GREEN, true);
             }
+            else
+            {
+                var diff = originalSize - data.Length;
+                // Write new serial size first
+                using (var fs = new FileStream(uassetFile.ActualFile.FullName, FileMode.Open, FileAccess.Write))
+                {
+                    var exportObj = ownerPackage.ExportMap[0];
+                    var bytes = exportObj.IsSerialSizeLong ? BitConverter.GetBytes(exportObj.SerialSize - diff) : BitConverter.GetBytes((int)exportObj.SerialSize - diff);
+                    fs.Seek(exportObj.SerialSizeOffset, SeekOrigin.Begin);
+                    fs.Write(bytes, 0, bytes.Length);
+                }
+
+                using (var fs = new FileStream(uexpFile.ActualFile.FullName, FileMode.Open, FileAccess.ReadWrite))
+                {
+                    // Update property size
+                    var sizeBytes = BitConverter.GetBytes(data.Length + 4);
+                    fs.Seek(property.SizeOffset, SeekOrigin.Begin);
+                    fs.Write(sizeBytes, 0, sizeBytes.Length);
+
+                    // Update array size
+                    sizeBytes = BitConverter.GetBytes(data.Length);
+                    fs.Seek(property.Offset, SeekOrigin.Begin);
+                    fs.Write(sizeBytes, 0, sizeBytes.Length);
+
+                    // Read and store bytes after data
+                    var extraBytes = new byte[fs.Length - property.Offset - 4 - originalSize];
+                    fs.Seek(fs.Length - extraBytes.Length, SeekOrigin.Begin);
+                    fs.Read(extraBytes, 0, extraBytes.Length);
+
+                    // Adjust size
+                    fs.SetLength(fs.Length - diff);
+
+                    // Write new data
+                    fs.Seek(property.Offset + 4, SeekOrigin.Begin);
+                    fs.Write(data, 0, data.Length);
+
+                    // Write extra bytes
+                    fs.Seek(property.Offset + 4 + data.Length, SeekOrigin.Begin);
+                    fs.Write(extraBytes, 0, extraBytes.Length);
+                }
+            }
+
+            FLogger.AppendText($"Successfully imported database for file {uassetFile.Name}", Constants.GREEN, true);
         }
     }
 
