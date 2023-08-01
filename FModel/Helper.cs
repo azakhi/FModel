@@ -16,6 +16,17 @@ public static class Helper
         internal readonly ulong UlongValue;
     }
 
+    public static string FixKey(string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return string.Empty;
+
+        if (key.StartsWith("0x"))
+            key = key[2..];
+
+        return "0x" + key.ToUpper().Trim();
+    }
+
     public static void OpenWindow<T>(string windowName, Action action) where T : Window
     {
         if (!IsWindowOpen<T>(windowName))
@@ -83,5 +94,15 @@ public static class Helper
         var n = d1 - d2;
         var d = (Math.Abs(d1) + Math.Abs(d2) + 10) * 1.0e-15;
         return -d < n && d > n;
+    }
+
+    public static float DegreesToRadians(float degrees)
+    {
+        return MathF.PI / 180f * degrees;
+    }
+
+    public static float RadiansToDegrees(float radians)
+    {
+        return radians* 180f / MathF.PI;
     }
 }

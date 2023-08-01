@@ -163,6 +163,7 @@ public class AudioPlayerViewModel : ViewModel, ISource, IDisposable
     private TimeSpan _length => _waveSource?.GetLength() ?? TimeSpan.Zero;
     private TimeSpan _position => _waveSource?.GetPosition() ?? TimeSpan.Zero;
     private PlaybackState _playbackState => _soundOut?.PlaybackState ?? PlaybackState.Stopped;
+    private bool _hideToggle = false;
 
     public SpectrumProvider Spectrum { get; private set; }
     public float[] FftData { get; private set; }
@@ -327,14 +328,16 @@ public class AudioPlayerViewModel : ViewModel, ISource, IDisposable
         if (File.Exists(path))
         {
             Log.Information("{FileName} successfully saved", fileToSave.FileName);
-            FLogger.AppendInformation();
-            FLogger.AppendText($"Successfully saved '{fileToSave.FileName}'", Constants.WHITE, true);
+            FLogger.Append(ELog.Information, () =>
+            {
+                FLogger.Text("Successfully saved ", Constants.WHITE);
+                FLogger.Link(fileToSave.FileName, path, true);
+            });
         }
         else
         {
             Log.Error("{FileName} could not be saved", fileToSave.FileName);
-            FLogger.AppendError();
-            FLogger.AppendText($"Could not save '{fileToSave.FileName}'", Constants.WHITE, true);
+            FLogger.Append(ELog.Error, () => FLogger.Text($"Could not save '{fileToSave.FileName}'", Constants.WHITE, true));
         }
     }
 
@@ -407,6 +410,13 @@ public class AudioPlayerViewModel : ViewModel, ISource, IDisposable
     {
         if (_soundOut == null || IsStopped) return;
         _soundOut.Stop();
+    }
+
+    public void HideToggle()
+    {
+        if (!IsPlaying) return;
+        _hideToggle = !_hideToggle;
+        RaiseSourcePropertyChangedEvent(ESourceProperty.HideToggle, _hideToggle);
     }
 
     public void SkipTo(double percentage)
@@ -560,7 +570,11 @@ public class AudioPlayerViewModel : ViewModel, ISource, IDisposable
     {
         wavFilePath = string.Empty;
         var vgmFilePath = Path.Combine(UserSettings.Default.OutputDirectory, ".data", "test.exe");
-        if (!File.Exists(vgmFilePath)) return false;
+        if (!File.Exists(vgmFilePath))
+        {
+            vgmFilePath = Path.Combine(UserSettings.Default.OutputDirectory, ".data", "vgmstream-cli.exe");
+            if (!File.Exists(vgmFilePath)) return false;
+        }
 
         Directory.CreateDirectory(SelectedAudioFile.FilePath.SubstringBeforeLast("/"));
         File.WriteAllBytes(SelectedAudioFile.FilePath, SelectedAudioFile.Data);

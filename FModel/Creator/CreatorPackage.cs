@@ -4,6 +4,7 @@ using CUE4Parse.UE4.Assets.Exports;
 using FModel.Creator.Bases;
 using FModel.Creator.Bases.BB;
 using FModel.Creator.Bases.FN;
+using FModel.Creator.Bases.MV;
 using FModel.Creator.Bases.SB;
 
 namespace FModel.Creator;
@@ -89,6 +90,7 @@ public class CreatorPackage : IDisposable
             case "FortPlaysetPropItemDefinition":
             case "FortHomebaseNodeItemDefinition":
             case "FortNeverPersistItemDefinition":
+            case "FortPlayerAugmentItemDefinition":
             case "RadioContentSourceItemDefinition":
             case "FortPlaysetGrenadeItemDefinition":
             case "FortPersonalVehicleItemDefinition":
@@ -105,8 +107,11 @@ public class CreatorPackage : IDisposable
             case "FortChallengeBundleScheduleDefinition":
             case "FortWeaponMeleeDualWieldItemDefinition":
             case "FortDailyRewardScheduleTokenDefinition":
+            case "FortCreativeWeaponRangedItemDefinition":
             case "FortCreativeRealEstatePlotItemDefinition":
             case "AthenaDanceItemDefinition_AdHocSquadsJoin_C":
+            case "StWFortAccoladeItemDefinition":
+            case "FortSmartBuildingItemDefinition":
                 creator = _style switch
                 {
                     EIconStyle.Cataba => new BaseCommunity(_object, _style, "Cataba"),
@@ -146,9 +151,10 @@ public class CreatorPackage : IDisposable
             case "FortFeatItemDefinition":
             case "FortQuestItemDefinition":
             case "FortQuestItemDefinition_Athena":
+            case "FortQuestItemDefinition_Campaign":
             case "AthenaDailyQuestDefinition":
             case "FortUrgentQuestItemDefinition":
-                creator = new BaseQuest(_object, _style);
+                creator = new Bases.FN.BaseQuest(_object, _style);
                 return true;
             case "FortCompendiumItemDefinition":
             case "FortChallengeBundleItemDefinition":
@@ -160,6 +166,7 @@ public class CreatorPackage : IDisposable
             case "FortItemAccessTokenType":
                 creator = new BaseItemAccessToken(_object, _style);
                 return true;
+            case "FortCreativeOption":
             case "PlaylistUserOptionEnum":
             case "PlaylistUserOptionBool":
             case "PlaylistUserOptionString":
@@ -172,6 +179,29 @@ public class CreatorPackage : IDisposable
             case "PlaylistUserOptionPrimaryAsset":
             case "PlaylistUserOptionCollisionProfileEnum":
                 creator = new BaseUserControl(_object, _style);
+                return true;
+            // PandaGame
+            case "CharacterData":
+                creator = new BaseFighter(_object, _style);
+                return true;
+            case "PerkGroup":
+                creator = new BasePerkGroup(_object, _style);
+                return true;
+            case "StatTrackingBundleData":
+            case "HydraSyncedDataAsset":
+            case "AnnouncerPackData":
+            case "CharacterGiftData":
+            case "ProfileIconData":
+            case "RingOutVfxData":
+            case "BannerData":
+            case "EmoteData":
+            case "TauntData":
+            case "SkinData":
+            case "PerkData":
+                creator = new BasePandaIcon(_object, _style);
+                return true;
+            case "QuestData":
+                creator = new Bases.MV.BaseQuest(_object, _style);
                 return true;
             // Battle Breakers
             case "WExpGenericAccountItemDefinition":

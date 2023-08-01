@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Linq;
 using CUE4Parse.FileProvider;
+using System.Threading;
 using FModel.Framework;
 using FModel.Services;
 
@@ -29,36 +30,50 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
                 case "Assets_Extract_New_Tab":
                     foreach (var asset in assetItems)
                     {
+                        Thread.Sleep(10);
                         cancellationToken.ThrowIfCancellationRequested();
-                        contextViewModel.CUE4Parse.Extract(asset.FullPath, true);
+                        contextViewModel.CUE4Parse.Extract(cancellationToken, asset.FullPath, true);
                     }
-
                     break;
                 case "Assets_Export_Data":
                     foreach (var asset in assetItems)
                     {
+                        Thread.Sleep(10);
                         cancellationToken.ThrowIfCancellationRequested();
                         contextViewModel.CUE4Parse.ExportData(asset.FullPath);
                     }
-
                     break;
                 case "Assets_Save_Properties":
                     foreach (var asset in assetItems)
                     {
+                        Thread.Sleep(10);
                         cancellationToken.ThrowIfCancellationRequested();
-                        contextViewModel.CUE4Parse.Extract(asset.FullPath);
-                        contextViewModel.CUE4Parse.TabControl.SelectedTab.SaveProperty(false);
+                        contextViewModel.CUE4Parse.Extract(cancellationToken, asset.FullPath, false, EBulkType.Properties);
                     }
-
                     break;
-                case "Assets_Save_Texture":
+                case "Assets_Save_Textures":
                     foreach (var asset in assetItems)
                     {
+                        Thread.Sleep(10);
                         cancellationToken.ThrowIfCancellationRequested();
-                        contextViewModel.CUE4Parse.Extract(asset.FullPath);
-                        contextViewModel.CUE4Parse.TabControl.SelectedTab.SaveImage(false);
+                        contextViewModel.CUE4Parse.Extract(cancellationToken, asset.FullPath, false, EBulkType.Textures);
                     }
-
+                    break;
+                case "Assets_Save_Models":
+                    foreach (var asset in assetItems)
+                    {
+                        Thread.Sleep(10);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        contextViewModel.CUE4Parse.Extract(cancellationToken, asset.FullPath, false, EBulkType.Meshes | EBulkType.Auto);
+                    }
+                    break;
+                case "Assets_Save_Animations":
+                    foreach (var asset in assetItems)
+                    {
+                        Thread.Sleep(10);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        contextViewModel.CUE4Parse.Extract(cancellationToken, asset.FullPath, false, EBulkType.Animations | EBulkType.Auto);
+                    }
                     break;
                 case "Assets_Export_Value_Map":
                     foreach (var asset in assetItems)

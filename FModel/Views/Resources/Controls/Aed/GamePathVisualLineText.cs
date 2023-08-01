@@ -1,10 +1,12 @@
-﻿using System;
+using System;
+using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.TextFormatting;
 using FModel.Extensions;
 using FModel.Services;
 using FModel.ViewModels;
+using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 
 namespace FModel.Views.Resources.Controls;
@@ -29,8 +31,13 @@ public class GamePathVisualLineText : VisualLineText
         if (context == null)
             throw new ArgumentNullException(nameof(context));
 
-        TextRunProperties.SetForegroundBrush(Brushes.Plum);
-        return base.CreateTextRun(startVisualColumn, context);
+        var relativeOffset = startVisualColumn - VisualColumn;
+        var text = context.GetText(context.VisualLine.FirstDocumentLine.Offset + RelativeTextOffset + relativeOffset, DocumentLength - relativeOffset);
+
+        if (text.Count != 2) // ": "
+            TextRunProperties.SetForegroundBrush(Brushes.Plum);
+
+        return new TextCharacters(text.Text, text.Offset, text.Count, TextRunProperties);
     }
 
     private bool GamePathIsClickable() => !string.IsNullOrEmpty(_gamePath) && Keyboard.Modifiers == ModifierKeys.None;
@@ -63,15 +70,27 @@ public class GamePathVisualLineText : VisualLineText
             var fullPath = _applicationView.CUE4Parse.Provider.FixPath(package, StringComparison.Ordinal);
             if (a.ParentVisualLine.Document.FileName.Equals(fullPath.SubstringBeforeLast('.'), StringComparison.OrdinalIgnoreCase))
             {
-                var lineNumber = a.ParentVisualLine.Document.Text.GetLineNumber(obj);
-                var line = a.ParentVisualLine.Document.GetLineByNumber(lineNumber);
+                int lineNumber;
+                DocumentLine line;
+
+                if (Regex.IsMatch(obj, @"^(.+)\[(\d+)\]$"))
+                {
+                    lineNumber = a.ParentVisualLine.Document.Text.GetKismetLineNumber(obj);
+                    line = a.ParentVisualLine.Document.GetLineByNumber(lineNumber);
+                }
+                else
+                {
+                    lineNumber = a.ParentVisualLine.Document.Text.GetLineNumber(obj);
+                    line = a.ParentVisualLine.Document.GetLineByNumber(lineNumber);
+                }
+                
                 AvalonEditor.YesWeEditor.Select(line.Offset, line.Length);
                 AvalonEditor.YesWeEditor.ScrollToLine(lineNumber);
             }
             else
             {
-                await _threadWorkerView.Begin(_ =>
-                    _applicationView.CUE4Parse.ExtractAndScroll(fullPath, obj));
+                await _threadWorkerView.Begin(cancellationToken =>
+                    _applicationView.CUE4Parse.ExtractAndScroll(cancellationToken, fullPath, obj));
             }
         };
         return a;

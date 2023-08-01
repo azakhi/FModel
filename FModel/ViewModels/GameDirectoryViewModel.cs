@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
 using CUE4Parse.UE4.Objects.Core.Misc;
-using CUE4Parse.UE4.Vfs;
+using CUE4Parse.UE4.VirtualFileSystem;
 
 namespace FModel.ViewModels;
 

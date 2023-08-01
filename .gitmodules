@@ -1,3 +1,6 @@
 [submodule "CUE4Parse"]
 	path = CUE4Parse
-	url = https://github.com/azakhi/CUE4Parse.git
+	url = https://github.com/azakhi/CUE4Parse
+[submodule "EpicManifestParser"]
+	path = EpicManifestParser
+	url = https://github.com/FModel/EpicManifestParser

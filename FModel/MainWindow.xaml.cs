@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -27,9 +28,6 @@ public partial class MainWindow
 
     public MainWindow()
     {
-        CommandBindings.Add(new CommandBinding(new RoutedCommand("AutoSaveProps", typeof(MainWindow), new InputGestureCollection { new KeyGesture(UserSettings.Default.AutoSaveProps.Key, UserSettings.Default.AutoSaveProps.Modifiers) }), OnAutoTriggerExecuted));
-        CommandBindings.Add(new CommandBinding(new RoutedCommand("AutoSaveTextures", typeof(MainWindow), new InputGestureCollection { new KeyGesture(UserSettings.Default.AutoSaveTextures.Key, UserSettings.Default.AutoSaveTextures.Modifiers) }), OnAutoTriggerExecuted));
-        CommandBindings.Add(new CommandBinding(new RoutedCommand("AutoOpenSounds", typeof(MainWindow), new InputGestureCollection { new KeyGesture(UserSettings.Default.AutoOpenSounds.Key, UserSettings.Default.AutoOpenSounds.Modifiers) }), OnAutoTriggerExecuted));
         CommandBindings.Add(new CommandBinding(new RoutedCommand("ReloadMappings", typeof(MainWindow), new InputGestureCollection { new KeyGesture(Key.F12) }), OnMappingsReload));
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => OnOpenAvalonFinder()));
 
@@ -48,6 +46,7 @@ public partial class MainWindow
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        var newOrUpdated = UserSettings.Default.ShowChangelog;
 #if !DEBUG
         ApplicationService.ApiEndpointView.FModelApi.CheckForUpdates(UserSettings.Default.UpdateMode);
 #endif
@@ -65,14 +64,30 @@ public partial class MainWindow
 
         await _applicationView.CUE4Parse.Initialize();
         await _applicationView.AesManager.InitAes();
-        await _applicationView.AesManager.UpdateProvider(true);
+        await _applicationView.UpdateProvider(true);
+#if !DEBUG
         await _applicationView.CUE4Parse.InitInformation();
-        await _applicationView.CUE4Parse.InitBenMappings();
-        await _applicationView.InitVgmStream();
-        await _applicationView.InitOodle();
+#endif
+        await Task.WhenAll(
+            _applicationView.CUE4Parse.VerifyConsoleVariables(),
+            _applicationView.CUE4Parse.VerifyVirtualCache(),
+            _applicationView.CUE4Parse.VerifyContentBuildManifest(),
+            _applicationView.CUE4Parse.InitMappings(),
+            _applicationView.InitImGuiSettings(newOrUpdated),
+            _applicationView.InitVgmStream(),
+            _applicationView.InitOodle(),
+            Task.Run(() =>
+            {
+                if (UserSettings.Default.DiscordRpc == EDiscordRpc.Always)
+                    _discordHandler.Initialize(_applicationView.GameDisplayName);
+            })
+        ).ConfigureAwait(false);
 
-        if (UserSettings.Default.DiscordRpc == EDiscordRpc.Always)
-            _discordHandler.Initialize(_applicationView.CUE4Parse.Game);
+#if DEBUG
+        // await _threadWorkerView.Begin(cancellationToken =>
+        //     _applicationView.CUE4Parse.Extract(cancellationToken,
+        //         "fortnitegame/Content/Characters/Player/Female/Medium/Bodies/F_MED_Ballerina/Meshes/F_MED_Ballerina.uasset"));
+#endif
     }
 
     private void OnGridSplitterDoubleClick(object sender, MouseButtonEventArgs e)
@@ -87,10 +102,10 @@ public partial class MainWindow
 
         if (_threadWorkerView.CanBeCanceled && e.Key == Key.Escape)
         {
-            _applicationView.Status = EStatusKind.Stopping;
+            _applicationView.Status.SetStatus(EStatusKind.Stopping);
             _threadWorkerView.Cancel();
         }
-        else if (_applicationView.IsReady && e.Key == Key.F && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        else if (_applicationView.Status.IsReady && e.Key == Key.F && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
             OnSearchViewClick(null, null);
         else if (e.Key == Key.Left && _applicationView.CUE4Parse.TabControl.SelectedTab.HasImage)
             _applicationView.CUE4Parse.TabControl.SelectedTab.GoPreviousImage();
@@ -125,23 +140,7 @@ public partial class MainWindow
 
     private async void OnMappingsReload(object sender, ExecutedRoutedEventArgs e)
     {
-        await _applicationView.CUE4Parse.InitBenMappings();
-    }
-
-    private void OnAutoTriggerExecuted(object sender, ExecutedRoutedEventArgs e)
-    {
-        switch ((e.Command as RoutedCommand)?.Name)
-        {
-            case "AutoSaveProps":
-                UserSettings.Default.IsAutoSaveProps = !UserSettings.Default.IsAutoSaveProps;
-                break;
-            case "AutoSaveTextures":
-                UserSettings.Default.IsAutoSaveTextures = !UserSettings.Default.IsAutoSaveTextures;
-                break;
-            case "AutoOpenSounds":
-                UserSettings.Default.IsAutoOpenSounds = !UserSettings.Default.IsAutoOpenSounds;
-                break;
-        }
+        await _applicationView.CUE4Parse.InitMappings();
     }
 
     private void OnOpenAvalonFinder()
@@ -179,6 +178,11 @@ public partial class MainWindow
         if (AssetsFolderName.SelectedItem is TreeItem folder)
         {
             await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.ExportFolder(cancellationToken, folder); });
+            FLogger.Append(ELog.Information, () =>
+            {
+                FLogger.Text("Successfully exported ", Constants.WHITE);
+                FLogger.Link(folder.PathAtThisPoint, UserSettings.Default.RawDataDirectory, true);
+            });
         }
     }
 
@@ -187,6 +191,40 @@ public partial class MainWindow
         if (AssetsFolderName.SelectedItem is TreeItem folder)
         {
             await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.SaveFolder(cancellationToken, folder); });
+            FLogger.Append(ELog.Information, () =>
+            {
+                FLogger.Text("Successfully saved ", Constants.WHITE);
+                FLogger.Link(folder.PathAtThisPoint, UserSettings.Default.PropertiesDirectory, true);
+            });
+        }
+    }
+
+    private async void OnFolderTextureClick(object sender, RoutedEventArgs e)
+    {
+        if (AssetsFolderName.SelectedItem is TreeItem folder)
+        {
+            await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.TextureFolder(cancellationToken, folder); });
+            FLogger.Append(ELog.Information, () =>
+            {
+                FLogger.Text("Successfully saved ", Constants.WHITE);
+                FLogger.Link(folder.PathAtThisPoint, UserSettings.Default.TextureDirectory, true);
+            });
+        }
+    }
+
+    private async void OnFolderModelClick(object sender, RoutedEventArgs e)
+    {
+        if (AssetsFolderName.SelectedItem is TreeItem folder)
+        {
+            await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.ModelFolder(cancellationToken, folder); });
+        }
+    }
+
+    private async void OnFolderAnimationClick(object sender, RoutedEventArgs e)
+    {
+        if (AssetsFolderName.SelectedItem is TreeItem folder)
+        {
+            await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.AnimationFolder(cancellationToken, folder); });
         }
     }
 
@@ -195,8 +233,8 @@ public partial class MainWindow
         if (AssetsFolderName.SelectedItem is not TreeItem folder) return;
 
         _applicationView.CustomDirectories.Add(new CustomDirectory(folder.Header, folder.PathAtThisPoint));
-        FLogger.AppendInformation();
-        FLogger.AppendText($"Successfully saved '{folder.PathAtThisPoint}' as a new custom directory", Constants.WHITE, true);
+        FLogger.Append(ELog.Information, () =>
+            FLogger.Text($"Successfully saved '{folder.PathAtThisPoint}' as a new custom directory", Constants.WHITE, true));
     }
 
     private void OnCopyDirectoryPathClick(object sender, RoutedEventArgs e)
@@ -222,14 +260,14 @@ public partial class MainWindow
 
     private void OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (!_applicationView.IsReady || sender is not ListBox listBox) return;
+        if (!_applicationView.Status.IsReady || sender is not ListBox listBox) return;
         UserSettings.Default.LoadingMode = ELoadingMode.Multiple;
         _applicationView.LoadingModes.LoadCommand.Execute(listBox.SelectedItems);
     }
 
     private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_applicationView.IsReady || sender is not ListBox listBox) return;
+        if (!_applicationView.Status.IsReady || sender is not ListBox listBox) return;
 
         switch (e.Key)
         {

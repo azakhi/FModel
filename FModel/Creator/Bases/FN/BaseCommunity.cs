@@ -1,3 +1,4 @@
+using CUE4Parse.GameTypes.FN.Enums;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Objects.GameplayTags;
 using CUE4Parse.UE4.Objects.UObject;
@@ -101,20 +102,8 @@ public class BaseCommunity : BaseIcon
     {
         if (!bShort) return base.GetCosmeticSeason(seasonNumber);
         var s = seasonNumber["Cosmetics.Filter.Season.".Length..];
-        var number = int.Parse(s);
-
-        switch (number)
-        {
-            case 10:
-                s = "X";
-                break;
-            case > 18:
-                number += 2;
-                s = number.ToString();
-                break;
-        }
-
-        return $"C{number / 10 + 1} S{s[^1..]}";
+        (int chapterIdx, int seasonIdx) = GetInternalSID(int.Parse(s));
+        return $"C{chapterIdx} S{seasonIdx}";
     }
 
     private new void DrawBackground(SKCanvas c)
@@ -167,10 +156,9 @@ public class BaseCommunity : BaseIcon
             }
 
             var shaper = new CustomSKShaper(DisplayNamePaint.Typeface);
-            var shapedText = shaper.Shape(DisplayName, DisplayNamePaint);
             var x = font.Alignment switch
             {
-                SKTextAlign.Center => (Width - shapedText.Points[^1].X) / 2f,
+                SKTextAlign.Center => Width / 2f,
                 _ => font.X
             };
 
@@ -204,10 +192,9 @@ public class BaseCommunity : BaseIcon
             }
 
             var shaper = new CustomSKShaper(DescriptionPaint.Typeface);
-            var shapedText = shaper.Shape(Description, DescriptionPaint);
             var x = font.Alignment switch
             {
-                SKTextAlign.Center => (Width - shapedText.Points[^1].X) / 2f,
+                SKTextAlign.Center => Width / 2f,
                 _ => font.X
             };
 
@@ -248,11 +235,9 @@ public class BaseCommunity : BaseIcon
             DisplayNamePaint.Typeface = Utils.Typefaces.OnTheFly(path);
 
         var shaper = new CustomSKShaper(DisplayNamePaint.Typeface);
-        var shapedText = shaper.Shape(text, DisplayNamePaint);
         var x = font.Alignment switch
         {
-            SKTextAlign.Center => (Width - shapedText.Points[^1].X) / 2f,
-            SKTextAlign.Right => font.X - DisplayNamePaint.MeasureText(text),
+            SKTextAlign.Center => Width / 2f,
             _ => font.X
         };
 

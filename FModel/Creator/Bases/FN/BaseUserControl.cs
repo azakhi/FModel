@@ -37,9 +37,9 @@ public class BaseUserControl : UCreator
 
     public override void ParseForInfo()
     {
-        if (Object.TryGetValue(out FText optionDisplayName, "OptionDisplayName"))
+        if (Object.TryGetValue(out FText optionDisplayName, "OptionDisplayName", "OptionText"))
             DisplayName = optionDisplayName.Text.ToUpperInvariant();
-        if (Object.TryGetValue(out FText optionDescription, "OptionDescription"))
+        if (Object.TryGetValue(out FText optionDescription, "OptionDescription", "OptionToolTip"))
         {
             Description = optionDescription.Text;
 
@@ -48,12 +48,12 @@ public class BaseUserControl : UCreator
             Height += (int) _descriptionPaint.TextSize;
         }
 
-        if (Object.TryGetValue(out FStructFallback[] optionValues, "OptionValues"))
+        if (Object.TryGetValue(out FStructFallback[] optionValues, "OptionValues", "Options"))
         {
             _optionValues = new List<Options>();
             foreach (var option in optionValues)
             {
-                if (option.TryGetValue(out FText displayName, "DisplayName"))
+                if (option.TryGetValue(out FText displayName, "DisplayName", "DisplayText"))
                 {
                     var opt = new Options { Option = displayName.Text.ToUpperInvariant() };
                     if (option.TryGetValue(out FLinearColor color, "Value"))
@@ -146,7 +146,6 @@ public class BaseUserControl : UCreator
         }
 
         var shaper = new CustomSKShaper(_displayNamePaint.Typeface);
-        shaper.Shape(DisplayName, _displayNamePaint);
         c.DrawShapedText(shaper, DisplayName, Margin, Margin + _displayNamePaint.TextSize, _displayNamePaint);
 #if DEBUG
         c.DrawRect(new SKRect(Margin, Margin, Width - Margin, Margin + _displayNamePaint.TextSize), new SKPaint { Color = SKColors.Blue, IsStroke = true });
