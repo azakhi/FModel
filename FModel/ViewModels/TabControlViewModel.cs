@@ -17,6 +17,8 @@ using System.Windows.Media.Imaging;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse_Conversion.Textures;
 using Newtonsoft.Json;
+using Application = System.Windows.Application;
+using Microsoft.Win32;
 
 namespace FModel.ViewModels;
 
@@ -230,7 +232,7 @@ public class TabItem : ViewModel
     }
 
     public void AddImage(UTexture2D texture, bool save, bool updateUi)
-        => AddImage(texture.Name, texture.bRenderNearestNeighbor, texture.Decode(UserSettings.Default.OverridedPlatform), save, updateUi);
+        => AddImage(texture.Name, texture.RenderNearestNeighbor, texture.Decode(UserSettings.Default.OverridedPlatform), save, updateUi);
 
     public void AddImage(string name, bool rnn, SKBitmap[] img, bool save, bool updateUi)
     {
@@ -334,7 +336,7 @@ public class TabItem : ViewModel
         directory = saveFileDialog.FileName;
 
         Application.Current.Dispatcher.Invoke(() => File.WriteAllText(directory, json));
-        SaveCheck(directory, jsonName);
+        SaveCheck(directory, jsonName, true);
     }
 
     public Dictionary<string, object> ImportValueMap(string fileName)
@@ -374,7 +376,7 @@ public class TabItem : ViewModel
         directory = saveFileDialog.FileName;
 
         Application.Current.Dispatcher.Invoke(() => File.WriteAllBytes(directory, data));
-        SaveCheck(directory, dbName);
+        SaveCheck(directory, dbName, true);
     }
 
     public byte[] ImportDatabase()

@@ -55,7 +55,6 @@ using Serilog;
 using SkiaSharp;
 using UE4Config.Parsing;
 using Application = System.Windows.Application;
-
 namespace FModel.ViewModels;
 
 public class CUE4ParseViewModel : ViewModel
@@ -166,7 +165,7 @@ public class CUE4ParseViewModel : ViewModel
                 {
                     case FGame.StateOfDecay2:
                     {
-                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new List<DirectoryInfo>
+                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new DirectoryInfo[]
                             {
                                 new(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\StateOfDecay2\\Saved\\Paks"),
                                 new(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\StateOfDecay2\\Saved\\DisabledPaks")
@@ -175,14 +174,14 @@ public class CUE4ParseViewModel : ViewModel
                         break;
                     }
                     case FGame.FortniteGame:
-                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new List<DirectoryInfo>
+                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new DirectoryInfo[]
                             {
                                 new(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\FortniteGame\\Saved\\PersistentDownloadDir\\InstalledBundles"),
                             },
                             SearchOption.AllDirectories, true, versions);
                         break;
                     case FGame.eFootball:
-                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new List<DirectoryInfo>
+                        Provider = new DefaultFileProvider(new DirectoryInfo(gameDirectory), new DirectoryInfo[]
                             {
                                 new(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\KONAMI\\eFootball\\ST\\Download")
                             },
@@ -260,8 +259,8 @@ public class CUE4ParseViewModel : ViewModel
                                 }
                                 if (!_fnLive.IsMatch(fileManifest.Name)) continue;
 
-                                p.Initialize(fileManifest.Name, new Stream[] { fileManifest.GetStream() }
-                                    , it => new FStreamArchive(it, manifest.FileManifests.First(x => x.Name.Equals(it)).GetStream(), p.Versions));
+                                //p.Initialize(fileManifest.Name, new Stream[] { fileManifest.GetStream() }
+                                //    , it => new FStreamArchive(it, manifest.FileManifests.First(x => x.Name.Equals(it)).GetStream(), p.Versions));
                             }
 
                             FLogger.Append(ELog.Information, () =>
@@ -278,7 +277,7 @@ public class CUE4ParseViewModel : ViewModel
 
                             for (var i = 0; i < manifestInfo.Paks.Length; i++)
                             {
-                                p.Initialize(manifestInfo.Paks[i].GetFullName(), new[] { manifestInfo.GetPakStream(i) });
+                                //p.Initialize(manifestInfo.Paks[i].GetFullName(), new[] { manifestInfo.GetPakStream(i) });
                             }
 
                             FLogger.Append(ELog.Information, () =>
@@ -353,7 +352,7 @@ public class CUE4ParseViewModel : ViewModel
             file.FileCount = vfs.FileCount;
         }
 
-        Game = Provider.GameName.ToEnum(Game);
+        Game = Provider.InternalGameName.ToEnum(Game);
     }
 
     public void ClearProvider()
@@ -387,7 +386,7 @@ public class CUE4ParseViewModel : ViewModel
     {
         await _threadWorkerView.Begin(cancellationToken =>
         {
-            var info = _apiEndpointView.FModelApi.GetNews(cancellationToken, Provider.GameName);
+            var info = _apiEndpointView.FModelApi.GetNews(cancellationToken, Provider.InternalGameName);
             if (info == null) return;
 
             FLogger.Append(ELog.None, () =>
@@ -489,7 +488,7 @@ public class CUE4ParseViewModel : ViewModel
 
     public Task VerifyContentBuildManifest()
     {
-        if (Provider is not DefaultFileProvider || !Provider.GameName.Equals("FortniteGame", StringComparison.OrdinalIgnoreCase))
+        if (Provider is not DefaultFileProvider || !Provider.InternalGameName.Equals("FortniteGame", StringComparison.OrdinalIgnoreCase))
             return Task.CompletedTask;
 
         var persistentDownloadDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FortniteGame/Saved/PersistentDownloadDir");
@@ -581,7 +580,7 @@ public class CUE4ParseViewModel : ViewModel
     }
     private Task LoadHotfixedLocalizedResources()
     {
-        if (!Provider.GameName.Equals("fortnitegame", StringComparison.OrdinalIgnoreCase) || HotfixedResourcesDone) return Task.CompletedTask;
+        if (!Provider.InternalGameName.Equals("fortnitegame", StringComparison.OrdinalIgnoreCase) || HotfixedResourcesDone) return Task.CompletedTask;
         return Task.Run(() =>
         {
             var hotfixes = ApplicationService.ApiEndpointView.CentralApi.GetHotfixes(default, Provider.GetLanguageCode(UserSettings.Default.AssetLanguage));
@@ -903,10 +902,10 @@ public class CUE4ParseViewModel : ViewModel
 
         fileName = uassetFile.Name;
 
-        var exports = Provider.LoadObjectExports(fullPath);
+        var exports = Provider.LoadAllObjects(fullPath);
         if (exports.Count() > 1)
         {
-            FLogger.AppendText($"Exporting database from files with multiple exports is not supported", Constants.RED, true);
+            FLogger.Append(ELog.Error, () => FLogger.Text($"Exporting database from files with multiple exports is not supported", Constants.RED, true));
             return null;
         }
 
@@ -945,10 +944,10 @@ public class CUE4ParseViewModel : ViewModel
             return;
         }
 
-        var exports = Provider.LoadObjectExports(fullPath);
+        var exports = Provider.LoadAllObjects(fullPath);
         if (exports.Count() > 1)
         {
-            FLogger.AppendText($"Importing database to files with multiple exports is not supported", Constants.RED, true);
+            FLogger.Append(ELog.Error, () => FLogger.Text($"Importing database to files with multiple exports is not supported", Constants.RED, true));
             return;
         }
 
@@ -1016,7 +1015,7 @@ public class CUE4ParseViewModel : ViewModel
                 }
             }
 
-            FLogger.AppendText($"Successfully imported database for file {uassetFile.Name}", Constants.GREEN, true);
+            FLogger.Append(ELog.Information, () => FLogger.Text($"Successfully imported database for file {uassetFile.Name}", Constants.GREEN, true));
         }
     }
 
@@ -1043,7 +1042,7 @@ public class CUE4ParseViewModel : ViewModel
         if (ext == "uasset")
         {
             var editableProperties = new Dictionary<string, FPropertyTag>();
-            var exports = Provider.LoadObjectExports(fullPath);
+            var exports = Provider.LoadAllObjects(fullPath);
             foreach (var export in exports)
             {
                 GetEditableProperties(export.Properties, editableProperties, result);
@@ -1068,7 +1067,7 @@ public class CUE4ParseViewModel : ViewModel
 
         var editableProperties = new Dictionary<string, FPropertyTag>();
         var outputDict = new Dictionary<string, object>();
-        var exports = Provider.LoadObjectExports(fullPath);
+        var exports = Provider.LoadAllObjects(fullPath);
         foreach (var export in exports)
         {
             GetEditableProperties(export.Properties, editableProperties, outputDict);
@@ -1172,7 +1171,7 @@ public class CUE4ParseViewModel : ViewModel
         {
             if (!float.TryParse(newValue.ToString(), out var value))
             {
-                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                FLogger.Append(ELog.Error, () => FLogger.Text($"Edited value for {property.PName()} is invalid", Constants.RED, true));
                 return;
             }
 
@@ -1184,13 +1183,13 @@ public class CUE4ParseViewModel : ViewModel
             var bytes = BitConverter.GetBytes(value);
             stream.Seek(property.Offset, SeekOrigin.Begin);
             stream.Write(bytes, 0, bytes.Length);
-            FLogger.AppendText($"Successfully updated {property.PName()} from {floatProperty.Value} to {value}", Constants.GREEN, true);
+            FLogger.Append(ELog.Information, () => FLogger.Text($"Successfully updated {property.PName()} from {floatProperty.Value} to {value}", Constants.GREEN, true));
         }
         else if (property.Tag is IntProperty intProperty)
         {
             if (!int.TryParse(newValue.ToString(), out var value))
             {
-                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                FLogger.Append(ELog.Error, () => FLogger.Text($"Edited value for {property.PName()} is invalid", Constants.RED, true));
                 return;
             }
 
@@ -1202,13 +1201,13 @@ public class CUE4ParseViewModel : ViewModel
             var bytes = BitConverter.GetBytes(value);
             stream.Seek(property.Offset, SeekOrigin.Begin);
             stream.Write(bytes, 0, bytes.Length);
-            FLogger.AppendText($"Successfully updated {property.PName()} from {intProperty.Value} to {value}", Constants.GREEN, true);
+            FLogger.Append(ELog.Information, () => FLogger.Text($"Successfully updated {property.PName()} from {intProperty.Value} to {value}", Constants.GREEN, true));
         }
         else if (property.Tag is ByteProperty byteProperty)
         {
             if (!byte.TryParse(newValue.ToString(), out var value))
             {
-                FLogger.AppendText($"Edited value for {property.PName()} is invalid", Constants.RED, true);
+                FLogger.Append(ELog.Error, () => FLogger.Text($"Edited value for {property.PName()} is invalid", Constants.RED, true));
                 return;
             }
 
@@ -1219,7 +1218,7 @@ public class CUE4ParseViewModel : ViewModel
 
             stream.Seek(property.Offset, SeekOrigin.Begin);
             stream.Write(new byte[] { value }, 0, 1);
-            FLogger.AppendText($"Successfully updated {property.PName()} from {byteProperty.Value} to {value}", Constants.GREEN, true);
+            FLogger.Append(ELog.Information, () => FLogger.Text($"Successfully updated {property.PName()} from {byteProperty.Value} to {value}", Constants.GREEN, true));
         }
     }
 
@@ -1227,14 +1226,14 @@ public class CUE4ParseViewModel : ViewModel
     {
         if (value is not Newtonsoft.Json.Linq.JObject jobjectValue)
         {
-            FLogger.AppendText($"Edited value for {identifier} is invalid", Constants.RED, true);
+            FLogger.Append(ELog.Error, () => FLogger.Text($"Edited value for {identifier} is invalid", Constants.RED, true));
             return;
         }
 
         var container = jobjectValue.ToObject<Dictionary<string, object>>();
         if (container == null)
         {
-            FLogger.AppendText($"Edited value for {identifier} is invalid", Constants.RED, true);
+            FLogger.Append(ELog.Error, () => FLogger.Text($"Edited value for {identifier} is invalid", Constants.RED, true));
             return;
         }
 

@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using AdonisUI.Controls;
 using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Readers;
-using CUE4Parse.UE4.Vfs;
 using FModel.AssetEditor;
 using CUE4Parse.UE4.VirtualFileSystem;
 using FModel.Creator;
@@ -21,6 +20,7 @@ using FModel.Settings;
 using FModel.Views.Resources.Controls;
 using K4os.Compression.LZ4.Streams;
 using Microsoft.Win32;
+using CUE4Parse.FileProvider.Objects;
 
 namespace FModel.ViewModels.Commands;
 
@@ -130,13 +130,13 @@ public class LoadCommand : ViewModelCommand<LoadingModesViewModel>
             {
                 if (filter.Contains(entry.Vfs.Name))
                 {
-                    entries.Add(entry);
+                    files.Add(entry);
                     _applicationView.Status.UpdateStatusLabel(entry.Vfs.Name);
                 }
             }
             else
             {
-                entries.Add(entry);
+                files.Add(entry);
                 _applicationView.Status.UpdateStatusLabel(entry.Vfs.Name);
             }
         }
@@ -153,7 +153,7 @@ public class LoadCommand : ViewModelCommand<LoadingModesViewModel>
         }
 
         _applicationView.Status.UpdateStatusLabel("Folders & Packages");
-        _applicationView.CUE4Parse.AssetsFolder.BulkPopulate(entries);
+        _applicationView.CUE4Parse.AssetsFolder.BulkPopulate(files);
     }
 
     private void FilterNewOrModifiedFilesToDisplay(CancellationToken cancellationToken)

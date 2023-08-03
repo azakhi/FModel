@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using CUE4Parse.FileProvider;
+using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.UE4.Versions;
 using CUE4Parse.UE4.VirtualFileSystem;
 using FModel.Framework;
@@ -130,7 +131,7 @@ public class AssetsFolderViewModel
                         if (lastNode == null)
                         {
                             var nodePath = builder.ToString();
-                            lastNode = new TreeItem(folder, item.Package, entry?.Vfs.MountPoint ?? "", entry?.Vfs.Ver ?? 0, nodePath[..^1]);
+                            lastNode = new TreeItem(folder, item.Archive, entry?.Vfs.MountPoint ?? "", entry?.Vfs.Ver ?? new FPackageFileVersion(0, 0), nodePath[..^1]);
                             lastNode.Folders.SetSuppressionState(true);
                             lastNode.AssetsList.Assets.SetSuppressionState(true);
                             parentNode.Add(lastNode);
